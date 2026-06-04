@@ -32,10 +32,16 @@ export async function GET(request: Request) {
       'http://rss.cnn.com/rss/edition_world.rss'
     ];
 
-    const feedPromises = FEEDS.map(url => parser.parseURL(url).catch(e => {
-      console.error(`Failed to fetch feed: ${url}`, e);
-      return null;
-    }));
+    const feedPromises = FEEDS.map(async (url) => {
+      try {
+        const response = await fetch(url);
+        const xml = await response.text();
+        return await parser.parseString(xml);
+      } catch (e) {
+        console.error(`Failed to fetch feed: ${url}`, e);
+        return null;
+      }
+    });
     
     const results = await Promise.all(feedPromises);
     

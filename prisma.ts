@@ -3,11 +3,17 @@ import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const prismaClientSingleton = () => {
-  let connectionString = process.env.DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL;
+  let connectionString = dbUrl;
 
-  // Silencia la advertencia de seguridad forzando el modo verify-full si se detecta require
-  if (connectionString?.includes('sslmode=require') && !connectionString.includes('uselibpqcompat')) {
-    connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
+  if (dbUrl) {
+    const url = new URL(dbUrl);
+
+    // Silencia la advertencia de seguridad usando la API WHATWG URL
+    if (url.searchParams.get('sslmode') === 'require' && !url.searchParams.has('uselibpqcompat')) {
+      url.searchParams.set('sslmode', 'verify-full');
+    }
+    connectionString = url.toString();
   }
 
   const pool = new Pool({ connectionString });
