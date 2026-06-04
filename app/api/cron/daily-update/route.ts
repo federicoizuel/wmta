@@ -99,7 +99,9 @@ export async function GET(request: Request) {
           },
         });
       })
-    ]);
+    ], {
+      timeout: 20000 // Aumentamos el tiempo de espera a 20 segundos
+    });
 
     // Update last scan time for sources
     await prisma.mediaSource.updateMany({
