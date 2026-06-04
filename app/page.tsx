@@ -43,7 +43,7 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="grid gap-6">
-            {rankings.map((ranking) => (
+            {rankings.map((ranking: any) => (
               <div 
                 key={ranking.id}
                 className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-all hover:shadow-md hover:border-blue-200 flex items-start space-x-6"
