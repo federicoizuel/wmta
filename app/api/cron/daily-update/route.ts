@@ -103,7 +103,7 @@ export async function GET(request: Request) {
 
     // Update last scan time for sources
     await prisma.mediaSource.updateMany({
-      where: { id: { in: sources.map(s => s.id) } },
+      where: { id: { in: sources.map((s: any) => s.id) } },
       data: { lastScan: today },
     });
 
