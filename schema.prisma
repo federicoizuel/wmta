@@ -1,0 +1,56 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+}
+
+model MediaSource {
+  id              String   @id @default(cuid())
+  name            String
+  url             String
+  active          Boolean  @default(true)
+  lastScan        DateTime?
+  articles        Article[]
+}
+
+model Article {
+  id              String       @id @default(cuid())
+  title           String
+  url             String       @unique
+  content         String?      @db.Text
+  publishedAt     DateTime     @default(now())
+  mediaSourceId   String
+  mediaSource     MediaSource  @relation(fields: [mediaSourceId], references: [id])
+  topicId         String?      
+  topic           Topic?       @relation(fields: [topicId], references: [id])
+}
+
+model Topic {
+  id              String         @id @default(cuid())
+  name            String         @unique
+  relevanceScore  Float          @default(0)
+  category        String?
+  articles        Article[]
+  dailyRankings   DailyRanking[]
+}
+
+model DailyRanking {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  rank      Int
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id])
+  summary   String?  @db.Text
+
+  @@unique([date, rank])
+}
