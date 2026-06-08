@@ -104,35 +104,36 @@ export async function GET(request: Request) {
     today.setHours(0, 0, 0, 0); // Normalizar al inicio del día para el campo @db.Date
     console.log(`OpenAI returned ${data.topics.length} topics.`);
     console.log(`Processing for date: ${today.toISOString().split('T')[0]}`);
-    
-    // Use a transaction to clear existing rankings for today and add new ones (idempotency)
-    const deleteResult = await prisma.dailyRanking.deleteMany({ where: { date: today } });
-    console.log(`Deleted ${deleteResult.count} existing daily rankings for today.`);
 
-    const createPromises = data.topics.map((item: any, index: number) => {
+    // Use a transaction to clear existing rankings for today and add new ones (idempotency)
+    const transactionResult = await prisma.$transaction([
       prisma.dailyRanking.deleteMany({ where: { date: today } }),
-      ...data.topics.map((item: any, index: number) => {
-        return prisma.dailyRanking.create({
-          data: {
-            date: today,
-            rank: index + 1,
-            summary: item.summary,
-            topic: {
-              connectOrCreate: {
-                where: { name: item.name },
-                create: {
-                  name: item.name,
-                  category: item.category,
-                  relevanceScore: item.score || 0,
-                },
+      ...data.topics.map((item: any, index: number) =>
+        prisma.dailyRanking.create({
+        data: {
+          date: today,
+          rank: index + 1,
+          summary: item.summary,
+          topic: {
+            connectOrCreate: {
+              where: { name: item.name },
+              create: {
+                name: item.name,
+                category: item.category,
+                relevanceScore: item.score || 0,
               },
             },
           },
-        });
-      })
+        },
+      })),
     ], {
       timeout: 20000 // Aumentamos el tiempo de espera a 20 segundos
     });
+
+    const deleteResult = transactionResult[0] as { count: number };
+    const createdRankings = transactionResult.slice(1);
+    console.log(`Deleted ${deleteResult.count} existing daily rankings for today.`);
+    console.log(`Created ${createdRankings.length} new daily rankings.`);
 
     // Update last scan time for sources
     await prisma.mediaSource.updateMany({
