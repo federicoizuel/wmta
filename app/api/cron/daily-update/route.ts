@@ -13,6 +13,8 @@ export async function GET(request: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  console.log('Cron job started.');
+
   try {
     // 2. Fetch Active Media Sources
     const sources = await prisma.mediaSource.findMany({
@@ -20,6 +22,7 @@ export async function GET(request: Request) {
     });
 
     // 3. Data Ingestion: Fetch headlines from multiple Global RSS feeds
+    console.log(`Found ${sources.length} active media sources.`);
     const FEEDS = [
       'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',
       'http://feeds.bbci.co.uk/news/world/rss.xml',
@@ -34,7 +37,12 @@ export async function GET(request: Request) {
 
     const feedPromises = FEEDS.map(async (url) => {
       try {
+        // Mejorar la verificación de la respuesta de fetch
+        // para capturar errores HTTP antes de intentar parsear el XML.
         const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const xml = await response.text();
         return await parser.parseString(xml);
       } catch (e) {
@@ -50,6 +58,12 @@ export async function GET(request: Request) {
       .filter((feed): feed is NonNullable<typeof feed> => !!feed)
       .flatMap(feed => feed.items.map(item => item.title))
       .filter(Boolean);
+    
+    console.log(`Fetched ${headlines.length} headlines from RSS feeds.`);
+    if (headlines.length === 0) {
+      console.warn('No headlines were fetched. Skipping AI analysis and database update.');
+      return NextResponse.json({ success: true, message: 'No headlines to process.' });
+    }
 
     // 4. AI Analysis via OpenAI
     const completion = await openai.chat.completions.create({
@@ -65,14 +79,20 @@ export async function GET(request: Request) {
             3. Use fundamental names of conflicts, entities, or major recurring events (e.g., "Iran Conflict" instead of "War Powers Resolution", "Gaza Conflict", "US Elections 2024").
             Return JSON: { "topics": [{ "name": "Persistent Topic Name", "score": 95, "category": "Politics", "summary": "..." }] }
             Headlines:\n${headlines.slice(0, 400).join('\n')}`,
+            // Limitar la entrada a OpenAI para evitar exceder el límite de tokens
+            // y para que el log sea manejable.
+            // Considera ajustar el slice si 400 es demasiado o muy poco.
         },
       ],
       response_format: { type: "json_object" },
     });
 
     const aiResponseText = completion.choices[0].message.content;
+    console.log('OpenAI raw response:', aiResponseText);
 
-    if (!aiResponseText) throw new Error("Empty AI response");
+    if (!aiResponseText) {
+      throw new Error("Empty AI response");
+    }
     const data = JSON.parse(aiResponseText);
 
     if (!data.topics || !Array.isArray(data.topics)) {
@@ -81,10 +101,15 @@ export async function GET(request: Request) {
 
     // 5. Database Persistence (The "Historic Tracking" Logic)
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day for the @db.Date field
+    today.setHours(0, 0, 0, 0); // Normalizar al inicio del día para el campo @db.Date
+    console.log(`OpenAI returned ${data.topics.length} topics.`);
+    console.log(`Processing for date: ${today.toISOString().split('T')[0]}`);
     
     // Use a transaction to clear existing rankings for today and add new ones (idempotency)
-    await prisma.$transaction([
+    const deleteResult = await prisma.dailyRanking.deleteMany({ where: { date: today } });
+    console.log(`Deleted ${deleteResult.count} existing daily rankings for today.`);
+
+    const createPromises = data.topics.map((item: any, index: number) => {
       prisma.dailyRanking.deleteMany({ where: { date: today } }),
       ...data.topics.map((item: any, index: number) => {
         return prisma.dailyRanking.create({
