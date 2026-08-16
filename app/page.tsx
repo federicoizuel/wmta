@@ -1,7 +1,10 @@
 import prisma from '@/prisma';
 import { Newspaper, TrendingUp, Tag, Clock } from 'lucide-react';
+import { connection } from 'next/server';
 
 export default async function HomePage() {
+  await connection();
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
