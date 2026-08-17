@@ -1,5 +1,6 @@
 import prisma from '@/prisma';
-import { Newspaper, TrendingUp, Tag, Clock } from 'lucide-react';
+import { CalendarDays, Newspaper, TrendingUp, Tag, Clock } from 'lucide-react';
+import Link from 'next/link';
 import { connection } from 'next/server';
 
 export default async function HomePage() {
@@ -38,6 +39,13 @@ export default async function HomePage() {
             <Clock className="w-4 h-4 mr-1" />
             {today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
+          <Link
+            href="/monthly-ranking"
+            className="mt-5 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <CalendarDays className="mr-2 h-4 w-4" />
+            Monthly Ranking
+          </Link>
         </header>
 
         {rankings.length === 0 ? (
@@ -46,7 +54,7 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="grid gap-6">
-            {rankings.map((ranking: any) => (
+            {rankings.map((ranking) => (
               <div 
                 key={ranking.id}
                 className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-all hover:shadow-md hover:border-blue-200 flex items-start space-x-6"
